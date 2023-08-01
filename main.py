@@ -205,6 +205,7 @@ class ThreadedEmailCrawler(DynamicEmailCrawler):
         return BeautifulSoup(html, 'html.parser')
         
 if __name__ == "__main__":
+    print("Starting...")
     load_dotenv()
     thread_count = int(os.getenv("THREAD_COUNT", "4"))
     visited_links_path = os.getenv("VISITED_LINKS_PATH", "visited.txt")
