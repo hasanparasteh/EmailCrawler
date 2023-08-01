@@ -1,0 +1,9 @@
+.git
+
+env/
+html/
+.env
+.env.example
+
+geckodriver.log
+mails.txt

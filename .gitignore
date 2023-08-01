@@ -1,0 +1,8 @@
+env/
+
+html/
+mails.txt
+
+geckodriver.log
+
+.env
