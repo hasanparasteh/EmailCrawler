@@ -94,7 +94,19 @@ class StaticEmailCrawler:
         for link in links:
             if link in self.visited:
                 continue
+            if len(self.visited) > 100:
+                break
             self.loop(link)
+
+    def load_visited_links(self, visited_links_path: str, ):
+        if not os.path.exists(visited_links_path):
+            return False
+
+        with open(visited_links_path, "r") as visited_links_file:
+            for line in visited_links_file.readlines():
+                self.visited.append(line.strip().replace("\n", ""))
+        return True
+        
     
 
 class DynamicEmailCrawler(StaticEmailCrawler):
@@ -211,7 +223,6 @@ if __name__ == "__main__":
     load_dotenv()
     thread_count = int(os.getenv("THREAD_COUNT", "4"))
     visited_links_path = os.getenv("VISITED_LINKS_PATH", "visited.txt")
-    # crawler = ThreadedEmailCrawler(thread_count=thread_count)
     crawler = DynamicEmailCrawler()
     crawler.load_visited_links(visited_links_path=visited_links_path)
     try: 
