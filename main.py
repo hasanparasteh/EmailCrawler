@@ -22,7 +22,7 @@ logging.basicConfig(
     format='%(asctime)s [%(threadName)s] %(levelname)s: %(message)s'
 )
 
-URL = "https://www.graphis.com/competitions/call-for-entries/"
+URL = "https://www.graphis.com"
 ENABLE_PROXY = False
 
 class StaticEmailCrawler:
@@ -38,6 +38,8 @@ class StaticEmailCrawler:
 
     def insert_html(self, url: str, html_content: str) -> None:
         url = url.replace(URL, "")
+        url = url.replace("https://graphis.com", "")
+        url = url.replace("https://")
         
         if url.startswith('/'):
             url = url[1:]
@@ -60,11 +62,11 @@ class StaticEmailCrawler:
         internal_links = []
 
         for link in links:
-            href = link.get('href')
+            href: str = link.get('href')
             if href is not None:
                 if href.startswith('/'):
                     internal_links.append(urljoin(URL, href))
-                elif URL in href:
+                elif href.startswith(URL) or href.startswith("https://graphis.com"):
                     internal_links.append(href)
         return internal_links
 
