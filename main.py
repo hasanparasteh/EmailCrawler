@@ -39,7 +39,7 @@ class StaticEmailCrawler:
     def insert_html(self, url: str, html_content: str) -> None:
         url = url.replace(URL, "")
         url = url.replace("https://graphis.com", "")
-        url = url.replace("https://")
+        url = url.replace("https://", "")
         
         if url.startswith('/'):
             url = url[1:]
