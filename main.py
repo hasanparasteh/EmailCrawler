@@ -209,7 +209,8 @@ if __name__ == "__main__":
     load_dotenv()
     thread_count = int(os.getenv("THREAD_COUNT", "4"))
     visited_links_path = os.getenv("VISITED_LINKS_PATH", "visited.txt")
-    crawler = ThreadedEmailCrawler(thread_count=thread_count)
+    # crawler = ThreadedEmailCrawler(thread_count=thread_count)
+    crawler = DynamicEmailCrawler()
     crawler.load_visited_links(visited_links_path=visited_links_path)
     try: 
         crawler.loop(URL)
