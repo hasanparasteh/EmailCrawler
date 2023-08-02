@@ -94,8 +94,6 @@ class StaticEmailCrawler:
         for link in links:
             if link in self.visited:
                 continue
-            if len(self.visited) > 100:
-                break
             self.loop(link)
 
     def load_visited_links(self, visited_links_path: str, ):
