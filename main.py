@@ -119,14 +119,14 @@ class DynamicEmailCrawler(StaticEmailCrawler):
         
         logging.info("Waiting to load: %s", link)
         # Wait for all images to load
-        wait = WebDriverWait(browser, 10)
-        wait.until(EC.presence_of_element_located((By.TAG_NAME, "img")))
-        wait.until(lambda driver: driver.execute_script("return document.readyState") == 'complete')
-        wait.until(lambda driver: driver.execute_script("return Object.values(document.images).every(img => img.complete)"))
-        logging.info("Finished Waiting for: %s", link)
+        try:
+            wait = WebDriverWait(browser, 5)
+            wait.until(lambda driver: driver.execute_script("return document.readyState") == 'complete')
+            logging.info("Finished Waiting for: %s", link)
+        except:
+            pass
 
         html = browser.page_source
-
         browser.quit()
         return BeautifulSoup(html, 'html.parser')
 
