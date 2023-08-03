@@ -30,12 +30,9 @@ def crawl_url():
     global visited_links
     global file_lock
 
-    mail_file = open(MAIL_PATH, "a+")
-
     while True:
         url = shared_queue.get()
         if url is None:
-            mail_file.close()
             break
 
         c = Crawler(url)
@@ -56,12 +53,14 @@ def crawl_url():
 
             if len(mails) > 0:
                 with file_lock:
+                    mail_file = open(MAIL_PATH, "a+")
                     for mail in mails:
                         if mail in extracted_mails:
                             continue
                         
                         mail_file.write(mail + "\n")
                         extracted_mails.add(mail)
+                    mail_file.close()
             
             with visited_links_lock:
                 for link in links:
