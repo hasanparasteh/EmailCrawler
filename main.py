@@ -53,7 +53,6 @@ def crawl_url():
             c.release()
 
             logging.info("Found %s links and %s mails from %s", len(links), len(mails), url)
-            logging.debug("Mails are: %s", mails)
 
             if len(mails) > 0:
                 with file_lock:
@@ -76,7 +75,7 @@ def start(url: str):
 
     shared_queue.put(url)
 
-    num_threads = 4
+    num_threads = 8
     threads = []
 
     # Create and start the threads
