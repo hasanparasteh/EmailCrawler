@@ -56,17 +56,13 @@ def crawl_url():
             logging.debug("Mails are: %s", mails)
 
             if len(mails) > 0:
-                for mail in mails:
-                    if mail in extracted_mails:
-                        continue
-                    
-                    file_lock.acquire()
-                    try:
+                with file_lock:
+                    for mail in mails:
+                        if mail in extracted_mails:
+                            continue
+                        
                         mail_file.write(mail + "\n")
-                    finally:
-                        file_lock.release()
-
-                    extracted_mails.add(mail)
+                        extracted_mails.add(mail)
             
             with visited_links_lock:
                 for link in links:

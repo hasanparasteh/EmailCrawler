@@ -23,6 +23,9 @@ class Crawler(object):
     def __init__(self, url: str) -> None:
         options = webdriver.FirefoxOptions()
         options.headless = True
+        options.set_preference('permissions.default.stylesheet', 2)
+        options.set_preference('permissions.default.image', 2)
+        # options.set_preference('dom.ipc.plugins.enabled.libflashplayer.so', 'false')
 
         self.browser = webdriver.Firefox(options=options)
         self.url = url
