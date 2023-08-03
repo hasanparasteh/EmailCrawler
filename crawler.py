@@ -22,7 +22,7 @@ class Crawler(object):
 
     def __init__(self, url: str) -> None:
         options = webdriver.FirefoxOptions()
-        options.headless = False
+        options.headless = True
 
         self.browser = webdriver.Firefox(options=options)
         self.url = url
