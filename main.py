@@ -1,3 +1,4 @@
+import logging
 import queue
 import threading
 from os import getenv, path
@@ -9,39 +10,92 @@ from crawler import Crawler, Extractor
 
 load_dotenv()
 
-HTML_PATH = getenv("HTML_PATH", "html")
 MAIL_PATH = getenv("MAIL_PATH", "mails.txt")
 
-def start(url: str):
-    visited_links = set()
-    extracted_mails = set()
-    stack = [url]
-    
-    while stack:
-        current_url = stack.pop()
-        print(current_url)
-        visited_links.add(current_url)
-        
-        c = Crawler(current_url)
-        c.load_html()
+file_lock = threading.Lock()
+visited_links_lock = threading.Lock()
 
-        mails = Extractor.find_emails(c.grab_html())
-        if len(mails) > 0:
-            with open(MAIL_PATH , "w") as f:
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s'
+)
+
+global visited_links
+visited_links = set()
+extracted_mails = set()
+shared_queue = queue.Queue()
+
+def crawl_url():
+    global shared_queue
+    global visited_links
+    global file_lock
+
+    mail_file = open(MAIL_PATH, "a+")
+
+    while True:
+        url = shared_queue.get()
+        if url is None:
+            mail_file.close()
+            break
+
+        c = Crawler(url)
+
+        is_html_loaded = True
+        try:
+            c.load_html()
+        except:
+            is_html_loaded = False
+            shared_queue.put(url)
+
+        if is_html_loaded:
+            mails = Extractor.find_emails(c.grab_html())
+            links = c.grab_links()
+            c.release()
+
+            logging.info("Found %s links and %s mails from %s", len(links), len(mails), url)
+            logging.debug("Mails are: %s", mails)
+
+            if len(mails) > 0:
                 for mail in mails:
                     if mail in extracted_mails:
                         continue
+                    
+                    file_lock.acquire()
+                    try:
+                        mail_file.write(mail + "\n")
+                    finally:
+                        file_lock.release()
+
                     extracted_mails.add(mail)
-                    f.write(mail + "\n")
+            
+            with visited_links_lock:
+                for link in links:
+                    if link not in visited_links:
+                        visited_links.add(link)
+                        shared_queue.put(link)
 
-        links = c.grab_links()
+def start(url: str):
+    global shared_queue
+    global visited_links
 
-        c.release()
+    shared_queue.put(url)
 
-        for link in links:
-            if link not in visited_links:
-                stack.append(link)
+    num_threads = 4
+    threads = []
+
+    # Create and start the threads
+    for _ in range(num_threads):
+        thread = threading.Thread(target=crawl_url)
+        thread.start()
+        threads.append(thread)
+
+    # Wait for all threads to finish
+    for thread in threads:
+        thread.join()
 
 
 if __name__ == "__main__":
-    start("https://www.graphis.com/competitions/call-for-entries/")
+    try:
+        start("https://www.graphis.com/competitions/call-for-entries/")
+    except KeyboardInterrupt:
+        print("Exit")

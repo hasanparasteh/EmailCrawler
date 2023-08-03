@@ -10,7 +10,7 @@ class SaveProgress:
     pass
 
 class Extractor:
-    pattern = r"[\w.+-]+@[\w-]+\.[\w.-]+"
+    pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
 
     @staticmethod
     def find_emails(text:str) -> List[str]:
