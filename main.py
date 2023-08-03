@@ -1,234 +1,47 @@
-import logging
-import os
-import re
+import queue
 import threading
-from typing import List
-from urllib.parse import urljoin
-
-import requests
-from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.proxy import Proxy, ProxyType
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
+from os import getenv, path
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
-from time import sleep
 
-# Set up the logging configuration
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(threadName)s] %(levelname)s: %(message)s'
-)
+from crawler import Crawler, Extractor
 
-URL = "https://www.graphis.com"
-ENABLE_PROXY = False
+load_dotenv()
 
-class StaticEmailCrawler:
-    pattern = r'[\w.+-]+@[\w-]+\.[\w.-]+'
-    visited = []
+HTML_PATH = getenv("HTML_PATH", "html")
+MAIL_PATH = getenv("MAIL_PATH", "mails.txt")
 
-    def __init__(self):
-        pass
-
-    def insert_mail(self, mail: str) -> None:
-        with open(os.getenv("MAIL_PATH","mails.txt"), "a") as f:
-            f.write(mail + "\n")
-
-    def insert_html(self, url: str, html_content: str) -> None:
-        url = url.replace(URL, "")
-        url = url.replace("https://graphis.com", "")
-        url = url.replace("https://", "")
-        
-        if url.startswith('/'):
-            url = url[1:]
-
-        if url == "":
-            url = "index"
-        
-        if url.endswith('/'):
-            url = url[:-1]
-        
-        file_path = "html/" + url + ".html"
-        dir_path, file_name = os.path.split(file_path)
-        if not os.path.exists(dir_path):
-            os.makedirs(dir_path, exist_ok=True)
-        with open(file_path, "w") as f:
-            f.write(html_content)
-
-    def find_all_links(self, soup: BeautifulSoup) -> List[str]:
-        links = soup.find_all('a')
-        internal_links = []
-
-        for link in links:
-            href: str = link.get('href')
-            if href is not None:
-                if href.startswith('/'):
-                    internal_links.append(urljoin(URL, href))
-                elif href.startswith(URL) or href.startswith("https://graphis.com"):
-                    internal_links.append(href)
-        return internal_links
-
-    def fetch_website(self, link: str) -> BeautifulSoup:
-        logging.info("Visiting %s", url)
-        response = requests.get(URL)
-        if response.status_code != 200:
-            raise Exception("Failed to get " + link)
-        return BeautifulSoup(response.content, 'html.parser')
-
-    def extract_emails(self, text: str):
-        return re.findall(self.pattern, text)
-
-
-    def loop(self, url: str = URL):
-        self.visited.append(url)
-        html = self.fetch_website(url)
-        self.insert_html(url, html.prettify())
-        mails = self.extract_emails(html.get_text())
-
-        for mail in mails:
-            self.insert_mail(mail)
-        
-        links = self.find_all_links(html)
-        for link in links:
-            if link in self.visited:
-                continue
-            self.loop(link)
-
-    def load_visited_links(self, visited_links_path: str, ):
-        if not os.path.exists(visited_links_path):
-            return False
-
-        with open(visited_links_path, "r") as visited_links_file:
-            for line in visited_links_file.readlines():
-                self.visited.append(line.strip().replace("\n", ""))
-        return True
-        
+def start(url: str):
+    visited_links = set()
+    extracted_mails = set()
+    stack = [url]
     
-
-class DynamicEmailCrawler(StaticEmailCrawler):
-    def fetch_website(self, link: str) -> BeautifulSoup:
-        options = webdriver.FirefoxOptions()
-        options.add_argument('--no-sandbox')
-        options.add_argument("--headless")
-        options.add_argument('--disable-dev-shm-usage')
-
-        browser = webdriver.Firefox(options=options)
-        browser.get(link)
+    while stack:
+        current_url = stack.pop()
+        print(current_url)
+        visited_links.add(current_url)
         
-        logging.info("Waiting to load: %s", link)
-        # Wait for all images to load
-        try:
-            wait = WebDriverWait(browser, 5)
-            wait.until(lambda driver: driver.execute_script("return document.readyState") == 'complete')
-            logging.info("Finished Waiting for: %s", link)
-        except:
-            pass
+        c = Crawler(current_url)
+        c.load_html()
 
-        html = browser.page_source
-        browser.quit()
-        return BeautifulSoup(html, 'html.parser')
+        mails = Extractor.find_emails(c.grab_html())
+        if len(mails) > 0:
+            with open(MAIL_PATH , "w") as f:
+                for mail in mails:
+                    if mail in extracted_mails:
+                        continue
+                    extracted_mails.add(mail)
+                    f.write(mail + "\n")
 
+        links = c.grab_links()
 
-class ThreadedEmailCrawler(DynamicEmailCrawler):
-    semaphore: threading.Semaphore
-    lock: threading.Lock
+        c.release()
 
-    def __init__(self,thread_count: int = 4):
-        self.semaphore = threading.Semaphore(thread_count)
-        self.lock = threading.Lock()
-
-    def load_visited_links(self, visited_links_path: str, ):
-        if not os.path.exists(visited_links_path):
-            return False
-
-        with open(visited_links_path, "r") as visited_links_file:
-            for line in visited_links_file.readlines():
-                self.visited.append(line.strip().replace("\n", ""))
-        return True
-        
-
-    def insert_mail(self, mail: str) -> None:
-        self.lock.acquire()
-        with open(os.getenv("MAIL_PATH","mails.txt"), "a") as f:
-            f.write(mail + "\n")
-        self.lock.release()
-    
-    def loop(self, url: str = URL):
-        self.visited.append(url)
-        html = self.fetch_website(url)
-        self.insert_html(url, html.prettify())
-        mails = self.extract_emails(html.get_text())
-
-        for mail in mails:
-            self.insert_mail(mail)
-        
-        threads = []
-        links = self.find_all_links(html)
         for link in links:
-            if link in self.visited:
-                continue
-            t = threading.Thread(target=self.loop, args=[link])
-            threads.append(t)
-            try:
-                t.start()
-            except Exception as e:
-                logging.error("FAILED TO START THREAD %s", e.args)
-                threads.pop()
-                self.loop(link)
+            if link not in visited_links:
+                stack.append(link)
 
 
-        for t in threads:
-            t.join()
-        
-    def fetch_website(self, link: str) -> BeautifulSoup:
-        self.semaphore.acquire()
-
-        options = webdriver.FirefoxOptions()
-        options.add_argument("--headless")
-        options.add_argument('--disable-gpu')
-        options.add_argument('--window-size=1920x1080');
-        
-        if ENABLE_PROXY:
-            proxy = Proxy({
-                'proxyType': ProxyType.MANUAL,
-                'socksProxy': os.getenv("PROXY_URL", '127.0.0.1'),
-                'socksProxyPort': int(os.getenv("PROXY_PORT", '1358')),
-                'socksVersion': 5
-            })
-            options.proxy = proxy
-
-        browser = webdriver.Firefox(options=options)
-        logging.info("Visiting: %s", link)
-        browser.get(link)
-        
-        logging.info("Waiting to load: %s", link)
-        # Wait website fully loaded
-        sleep(5)
-        # wait = WebDriverWait(browser, 10)
-        # wait.until(lambda driver: driver.execute_script("return document.readyState") == 'complete')
-        logging.info("Finished Waiting for: %s", link)
-
-        html = browser.page_source
-
-        browser.quit()
-        self.semaphore.release()
-        return BeautifulSoup(html, 'html.parser')
-        
 if __name__ == "__main__":
-    print("Starting...")
-    load_dotenv()
-    thread_count = int(os.getenv("THREAD_COUNT", "4"))
-    visited_links_path = os.getenv("VISITED_LINKS_PATH", "visited.txt")
-    crawler = DynamicEmailCrawler()
-    crawler.load_visited_links(visited_links_path=visited_links_path)
-    try: 
-        crawler.loop(URL)
-    except KeyboardInterrupt:
-        print("Bye")
-    finally:
-        with open(visited_links_path, "w") as visited_links_file:
-            for link in crawler.visited:
-                visited_links_file.write(link + "\n")
-        
+    start("https://www.graphis.com/competitions/call-for-entries/")
