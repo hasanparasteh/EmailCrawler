@@ -5,6 +5,8 @@ html/
 mails.txt
 visited.txt
 
+__pycache__/
+
 geckodriver.log
 
 .env
