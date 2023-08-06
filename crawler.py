@@ -1,6 +1,6 @@
 import re
 from typing import List
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse, parse_qs
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -25,10 +25,25 @@ class Crawler(object):
         options.headless = True
         options.set_preference('permissions.default.stylesheet', 2)
         options.set_preference('permissions.default.image', 2)
-        # options.set_preference('dom.ipc.plugins.enabled.libflashplayer.so', 'false')
 
         self.browser = webdriver.Firefox(options=options)
         self.url = url
+
+    def _remove_query_params_except_page(self, url: str):
+        parsed_url = urlparse(url)
+        query_params = parse_qs(parsed_url.query)
+        
+        if 'page' in query_params:
+            page_param = query_params['page'][0]
+            query_params = {'page': [page_param]}
+        else:
+            query_params = {}
+        
+        new_url_parts = list(parsed_url)
+        new_url_parts[4] = '&'.join(f"{k}={v[0]}" for k, v in query_params.items())
+        
+        new_url = urlunparse(new_url_parts)
+        return new_url
 
     def _is_internal_link(self, link: str):
         base_parsed = urlparse(self.url)
@@ -49,7 +64,8 @@ class Crawler(object):
                 continue
             if not self._is_internal_link(href):
                 continue
-            founded_links.append(href)
+
+            founded_links.append(self._remove_query_params_except_page(href))
 
         return founded_links
 
@@ -58,3 +74,4 @@ class Crawler(object):
 
     def release(self):
         self.browser.quit()
+

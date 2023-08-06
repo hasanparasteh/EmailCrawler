@@ -2,6 +2,7 @@ import logging
 import queue
 import threading
 from os import getenv, path
+from typing import List
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -46,7 +47,7 @@ def crawl_url():
 
         if is_html_loaded:
             mails = Extractor.find_emails(c.grab_html())
-            links = c.grab_links()
+            links: List[str] = c.grab_links()
             c.release()
 
             logging.info("Found %s links and %s mails from %s", len(links), len(mails), url)
