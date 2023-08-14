@@ -29,7 +29,7 @@ class Crawler(object):
         self.browser = webdriver.Firefox(options=options)
         self.url = url
 
-    def _remove_query_params_except_page(self, url: str):
+    def remove_query_params_except_page(self, url: str):
         parsed_url = urlparse(url)
         query_params = parse_qs(parsed_url.query)
         
@@ -65,7 +65,8 @@ class Crawler(object):
             if not self._is_internal_link(href):
                 continue
 
-            founded_links.append(self._remove_query_params_except_page(href))
+            href = re.sub(r'\#.', '', href)
+            founded_links.append(self.remove_query_params_except_page(href))
 
         return founded_links
 
@@ -75,3 +76,6 @@ class Crawler(object):
     def release(self):
         self.browser.quit()
 
+if __name__ == "__main__":
+    c = Crawler("https://google.com")
+    print(c.remove_query_params_except_page("https://google.com?name=mmd&page=1&feature=[123,120,234]"))
